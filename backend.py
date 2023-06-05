@@ -66,4 +66,19 @@ def make_query(page: str) -> dict:
             publications["related"].append(", ".join(raw))
     return publications
 
+def format_query(publications: dict) -> str:
+    formatted = "<h1>Documents and Publications</h1><h2>Publications/Documents by the DUNE Collaboration</h2><ul>"
+    for item in publications["collab"]:
+        formatted += "<li>" + item + "</li>"
+    formatted += "</ul><h2>DUNE Theses</h2><ul>"
+    for item in publications["thesis"]:
+        formatted += "<li>" + item + "</li>"
+    formatted += "</ul><h2>Related Publications by DUNE Collaborators</h2><ul>"
+    for item in publications["related"]:
+        formatted += "<li>" + item + "</li>"
+    formatted += "</ul>"
+    return formatted
+
 output = make_query("https://inspirehep.net/api/literature?sort=mostrecent&size=188&page=1&q=accelerator_experiments.record.%24ref%3A1346343")
+formatted = format_query(output)
+print(formatted)
