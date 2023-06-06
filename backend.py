@@ -7,19 +7,43 @@ import requests
 # ============
 # PAGE REQUEST
 
-def get_id(entry: dict):
-    identifier = entry["control_number"]
-    return "https://inspirehep.net/literature/" + str(identifier)
+def get_id(entry: dict) -> list:
+    """
+    Gets and formats the links to a particular entry.
+    """
+    if "thesis" in entry["document_type"]:
+        # Theses require unique formatting
+        return ["https://inspirehep.net/literature/" + str(entry["control_number"])]
+    
+    links = []
+    if "arxiv_eprints" in entry:
+        id = str(entry["arxiv_eprints"][0]["value"])
+        links.append("<a href=https://arxiv.org/abs/" + id + ">arXiv:" + id + "</a>")
+    if "dois" in entry:
+        id = str(entry["dois"][0]["value"])
+        if "publication_info" in entry:
+            pub_info = entry["publication_info"][0]
+            place = " ".join([pub_info["journal_title"], pub_info.get("journal_volume", ""),
+                            pub_info.get("artid", ""), "(" + str(pub_info.get("year", "")) + ")"])
+        else:
+            place = "DOI: " + id
+        links.append("<a href=https://doi.org/" + id + ">" + place + "</a>")
+    return links
 
-def get_collab_info(entry: dict):
+def get_collab_info(entry: dict) -> list:
+    """
+    Gets the information for a collaboration entry and enters it into a list.
+    """
     author = "DUNE collaboration"
     title = "\"" + entry["titles"][0]["title"] + "\""
-    id = get_id(entry)
-    return [author, title, id]
+    return [author, title] + get_id(entry)
 
-def get_thesis_info(entry: dict):
+def get_thesis_info(entry: dict) -> list:
+    """
+    Gets the information for a thesis entry and enters it into a list.
+    """
     author = " ".join(entry["authors"][0]["full_name"].split(", ")[::-1])
-    title = entry["titles"][0]["title"]
+    title = "<a href=" + get_id(entry)[0] + ">" + entry["titles"][0]["title"] + "</a>"
     institution = entry["thesis_info"]["institutions"][0]["name"]
     # Formatting institution as appropriate
     if institution[:2] == "U.":
@@ -40,20 +64,35 @@ def get_thesis_info(entry: dict):
         date = datetime.strptime(raw_date, "%Y-%m-%d").strftime("%B %Y")
     else:
         date = "Unknown"
-    id = get_id(entry)
-    return [author, title, institution, "Ph.D.", date, id]
+    return [author, title, institution, "Ph.D.", date]
 
-def get_related_info(entry: dict):
-    author = " ".join(entry["authors"][0]["full_name"].split(", ")[::-1]) + " et al."
+def get_related_info(entry: dict) -> list:
+    """
+    Gets the information for a related entry and enters it into a list.
+    """
+    author = " ".join(entry["authors"][0]["full_name"].split(", ")[::-1]) + " <i>et al.</i>"
     title = "\"" + entry["titles"][0]["title"] + "\""
-    id = get_id(entry)
-    return [author, title, id]
+    return [author, title] + get_id(entry)
+
+def retrieve_metadata(page: str) -> dict:
+    """
+    Returns the metadata for a single entry.
+    """
+    entry = requests.get(page).json()["metadata"]
+    return entry
 
 def make_query(page: str) -> dict:
+    """
+    Sorts the entries on a given page into collaborations, theses, and related publications.
+    Places them into a format ready for HTML tagging.
+    """
     entries = requests.get(page).json()["hits"]["hits"]
     publications = {"collab": [], "thesis": [], "related": []}
     for i in range(len(entries)): # Iterate through and format entries
         c_entry = entries[i]["metadata"]
+        if "conference paper" in c_entry["document_type"]:
+            # We ignore conference papers for the purpose of this page
+            continue
         if "collaborations" in c_entry and "DUNE" in [collab['value'].upper() for collab in c_entry["collaborations"]]:
             # Publication by DUNE Collaboration
             raw = get_collab_info(c_entry)
@@ -67,6 +106,9 @@ def make_query(page: str) -> dict:
     return publications
 
 def format_query(publications: dict) -> str:
+    """
+    Formats the dictionary resulting from make_query.
+    """
     formatted = "<h1>Documents and Publications</h1><h2>Publications/Documents by the DUNE Collaboration</h2><ul>"
     for item in publications["collab"]:
         formatted += "<li>" + item + "</li>"
