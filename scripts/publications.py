@@ -59,4 +59,8 @@ def getRawHTML(header: str, publications: list) -> str:
 
 output = makeQuery(DUNE_PUBLICATIONS)
 pubs = [getRawHTML(key, output[key]) for key in output]
-print("\n".join(pubs))
+
+with open("./publications.html", mode="w") as output:
+    print("\n".join(pubs), file=output)
+
+print("Done!")
